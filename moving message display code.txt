@@ -1,0 +1,193 @@
+#define F_CPU 1000000UL
+#include <avr/io.h>
+#include <util/delay.h>
+#include <string.h>
+
+
+#ifndef LCD_H_
+#define LCD_H_
+
+
+void lcd_init();
+void cmd(char c);
+void data(char d);
+void string(const char *str);
+void shift_message(const char *msg);
+
+void cmd(char c){
+	PORTD = c & 0xf0;
+	PORTD &= ~(1 << PD0);
+	PORTD &= ~(1 << PD1);
+	PORTD |= (1 << PD2);
+	_delay_ms(5);
+	PORTD &= ~(1 << PD2);
+	_delay_ms(5);
+
+	PORTD = (c << 4) & 0xf0;
+	PORTD &= ~(1 << PD0);
+	PORTD &= ~(1 << PD1);
+	PORTD |= (1 << PD2);
+	_delay_ms(5);
+	PORTD &= ~(1 << PD2);
+	_delay_ms(5);
+}
+
+void data(char d){
+	PORTD = d & 0xf0;
+	PORTD |= (1 << PD0);
+	PORTD &= ~(1 << PD1);
+	PORTD |= (1 << PD2);
+	_delay_ms(5);
+	PORTD &= ~(1 << PD2);
+	_delay_ms(5);
+
+	PORTD = (d << 4) & 0xf0;
+	PORTD |= (1 << PD0);
+	PORTD &= ~(1 << PD1);
+	PORTD |= (1 << PD2);
+	_delay_ms(5);
+	PORTD &= ~(1 << PD2);
+	_delay_ms(5);
+}
+
+void string(const char *str){
+	while(*str){
+		data(*str++);
+		_delay_ms(10);   //delay for readability
+	}
+}
+
+void lcd_init(){
+	DDRD = 0xff;
+	cmd(0x02); // Initialize in 4-bit mode
+	cmd(0x28); // 4-bit mode, 2 lines, 5x7 font
+	cmd(0x0e); // Display ON, cursor ON
+	cmd(0x01); // Clear display
+	cmd(0x06); // Increment cursor
+	cmd(0x80); // Move cursor to the beginning of the first line
+	cmd(0x1c);
+}
+
+void shift_message(const char *msg){
+	char buffer[17]; // Display buffer for 16 characters + null terminator
+	int len = strlen(msg);
+	for (int i = 0; i < len+1; i++) {
+		cmd(0x80); // Set cursor to the beginning of the first line
+		for (int j = 0; j < 16; j++) {
+			if (i + j < len) {
+				buffer[j] = msg[(i + j) % len];
+			}
+			else {
+				buffer[j] = ' '; // Fill with spaces when shifting out of bounds
+			}
+		}
+		buffer[16] = '\0'; // Null terminate the string
+		string(buffer);
+		_delay_ms(1000);
+	}
+}
+
+
+
+#endif /* LCD_H_ */
+int main(void){
+	lcd_init();
+	DDRB = 0x0F; // Rows as output, columns as input
+	PORTB |= 0xF0; // Enable pull-up for input pins
+
+	const char *message = "Welcome to IET";
+	cmd(0xC0); // Move cursor to the second line
+
+	for(int i=0;i<=1;i++){
+		// Display the scrolling message on the first line
+		shift_message(message);
+
+		// Keypad typing on the second line
+		cmd(0xC0);	// Move cursor to the beginning of the second line
+		while(1){
+			// First column
+			PORTB &= ~(1 << PB0);
+			PORTB |= (1 << PB3) | (1 << PB1)|(1<<PB2);
+
+			if (!(PINB & (1 << PB4))){
+				data('D');
+				_delay_ms(2000);
+			}
+			else if (!(PINB & (1 << PB5))) {
+				data('C');
+				_delay_ms(2000);
+			}
+			else if (!(PINB & (1 << PB6))) {
+				data('B');
+				_delay_ms(2000);
+			}
+			else if (!(PINB & (1 << PB7))) {
+				data('A');
+				_delay_ms(2000);
+			}
+
+			// Second column
+			PORTB &= ~(1 << PB1);
+			PORTB |= (1 << PB0) | (1 << PB2)|(1 << PB3);
+
+			if (!(PINB & (1 << PB4))) {
+			data('#');
+				_delay_ms(2000);
+			}
+			else if (!(PINB & (1 << PB5))) {
+				data('9');
+				_delay_ms(2000);
+			}
+			else if (!(PINB & (1 << PB6))) {
+				data('6');
+				_delay_ms(2000);
+			}
+			else if (!(PINB & (1 << PB7))) {
+				data('3');
+				_delay_ms(2000);
+			}
+
+			// Third column
+			PORTB &= ~(1 << PB2);
+			PORTB |= (1 << PB0) | (1 << PB1)| (1 << PB3);
+
+			if (!(PINB & (1 << PB4))) {
+				data('0');
+				_delay_ms(2000);
+			}
+			else if (!(PINB & (1 << PB5))) {
+				data('8');
+				_delay_ms(2000);
+			}
+			else if (!(PINB & (1 << PB6))) {
+				data('5');
+				_delay_ms(2000);
+			}
+			else if (!(PINB & (1 << PB7))) {
+				data('2');
+				_delay_ms(2000);
+			}
+		
+				// fourth column
+				PORTB &= ~(1 << PB3);
+				PORTB |= (1 << PB2) | (1 << PB1)| (1 << PB0);
+
+				if (!(PINB & (1 << PB4))) {
+						cmd(0x01);      // Clear display
+					_delay_ms(2000);
+				}
+				else if (!(PINB & (1 << PB5))) {
+					data('7');
+					_delay_ms(2000);
+				}
+				else if (!(PINB & (1 << PB6))) {
+					data('4');
+					_delay_ms(2000);
+				}
+				else if (!(PINB & (1 << PB7))) {
+					data('1');
+					_delay_ms(2000);
+				}
+			}
+		}
+	}
